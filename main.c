@@ -1,6 +1,6 @@
 #include "msp430g2553.h"
 //#include "io430.h"
-
+//hej
 unsigned int adc[] = {0, 0, 0};
 //unsigned int SensorData[] = {0, 0, 0};
 unsigned int tempC;
