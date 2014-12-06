@@ -7,7 +7,7 @@ unsigned int tempC;
 //int voltage;
 unsigned char *PTxData;
 //int TXByteCtr;
-char TxData[] = {0, 0, 0};
+char TxData[] = {0x01, 0x02, 0x03};
 //char TxData[] = {0, 0, 0};
 int v[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 float Cfactor = 0.3515625;      // 360/1024
@@ -98,17 +98,30 @@ int main(void)
 {
   WDTCTL = WDTPW + WDTHOLD;               // Stop watchdog timer
 
-  init_i2c();
-  configureAdc();
-  fillBuffer();
-  P1OUT = ~(0x10);
+  //init_i2c();
+  //configureAdc();
+  //fillBuffer();
+  //P1OUT = ~(0x10);
+  
+  P1DIR = 0x08;
+  P1OUT &= ~0x08;
+  
   
   while(1)
   { 
+    TxData[0]++;
+    TxData[1]++;
+    TxData[2]++;
     
-    fillBuffer();
+    PTxData = (unsigned char *)TxData;
+    
+    init_i2c();
+    P1OUT = 0x08;
+    
+    __bis_SR_register(CPUOFF + GIE);
+    
     __delay_cycles(5000000); 
-    P1OUT = (0x10);
+
   }
 }
 //------------------------------------------------------------------------------
@@ -121,10 +134,7 @@ int main(void)
 __interrupt void USCIAB0TX_ISR(void)
 {
   UCB0TXBUF = *PTxData++;
-  //__bic_SR_register_on_exit(CPUOFF);      // Exit LPM0 if data was
-  //UCB0TXBUF = *PTxData++;         // Transmit data at address PTxData
-  //TXByteCtr++;                    // Increment TX byte counter
-  
+  __bic_SR_register_on_exit(CPUOFF);      // Exit LPM0 if data was
 }
 
 //------------------------------------------------------------------------------
@@ -137,11 +147,9 @@ __interrupt void USCIAB0TX_ISR(void)
 #pragma vector = USCIAB0RX_VECTOR
 __interrupt void USCIAB0RX_ISR(void)
 {
-  //if (UCSTTIFG)
-  // status pin = 0
-  P1OUT = ~(0x10);
-  UCB0STAT &= ~(UCSTTIFG + UCSTTIFG);     // Clear interrupt flags
-  //UCB0STAT &= ~(UCSTPIFG + UCSTTIFG);     // Clear interrupt flags
-  //if (TXByteCtr)                          // Check TX byte counter
+  P1OUT &= ~0x08;
+  
+  UCB0STAT &= ~(UCSTTIFG + UCSTPIFG);     // Clear interrupt flags
+  
   __bic_SR_register_on_exit(CPUOFF);      // Exit LPM0 if data was
 } 
