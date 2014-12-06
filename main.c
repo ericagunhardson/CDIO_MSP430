@@ -7,7 +7,7 @@ unsigned int tempC;
 //int voltage;
 unsigned char *PTxData;
 //int TXByteCtr;
-char TxData[] = {0, 0, 0};
+char TxData[] = {0x01, 0x02, 0x03};
 //char TxData[] = {0, 0, 0};
 int v[10] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 float Cfactor = 0.3515625;      // 360/1024
@@ -38,7 +38,7 @@ void configureAdc()
   //ADC10CTL1 = INCH_3 + ADC10DIV_3;
   ADC10CTL1 = CONSEQ_1 + INCH_2;// + ADC10DIV_3;
   ADC10DTC1 = 0x03;
-  ADC10AE0 |= 0x07;
+  ADC10AE0 |= 0x03;
   //ADC10AE0 |= 0x08;                       // P1_3
   //ADC10AE0 |= 0x10;                       // P1_4
   //ADC10AE0 |= 0x20;                       // P1_5
@@ -46,8 +46,8 @@ void configureAdc()
   BCSCTL1 = CALBC1_1MHZ;                  // Clock calibration
   DCOCTL = CALDCO_1MHZ;                   // Clock calibration
   //BCSCTL2 &= ~(DIVS_3);
-  P1DIR = 0x10;
-  P1OUT = 0x10;
+  P1DIR |= 0x08;
+  //P1OUT = 0x08;
   //P1SEL |= 0x08;                        // Select P1_3
   //P1SEL |= 0x10;                        // Select P1_4
   //P1SEL |= 0x20;                        // Select P1_5
@@ -58,7 +58,6 @@ void configureAdc()
 #define NUMBER_OF_SAMPLES 10
 
 // Fill the TxData buffer
-//char fillBuffer()
 void fillBuffer()
 {
   
@@ -70,45 +69,57 @@ void fillBuffer()
     while (ADC10CTL1 & BUSY);
     ADC10SA = (unsigned int)adc;
     ADC10CTL0 |= ENC + ADC10SC;                 // Enable conversion
+    
     //__bis_SR_register(CPUOFF + GIE);          // Low power mode with enabled interrupts
     //SensorValue = ADC10MEM;                     // ADC conversion
    
-    for ( int i = 0; i < 3; i++ )
+    for ( int i = 0; i <= 3; i++ )
     {
-    TxData[i] = (int)(adc[i] * Cfactor) - 50;
-//    Sensor2 = (int)(adc[1] * Cfactor) - 50;
+      TxData[i] = (int)(adc[i] * Cfactor) - 50;
     }
     
     PTxData = (unsigned char *)TxData;
-    
-  //Sensor1= SensorValue[0];
-  //Sensor2= SensorValue[1];
-  __bis_SR_register(CPUOFF + GIE);
+
+ // __bis_SR_register(CPUOFF + GIE);
 }
 
 //ADC10 interrupt service routine
-#pragma vector=ADC10_VECTOR
-__interrupt void ADC10_ISR (void)
-{
-  __bic_SR_register_on_exit(CPUOFF);      // Return to active mode
-}
+//#pragma vector=ADC10_VECTOR
+//__interrupt void ADC10_ISR (void)
+//{
+//  __bic_SR_register_on_exit(CPUOFF);      // Return to active mode
+//}
 
-
+#pragma optimize=none
 int main(void) 
 {
   WDTCTL = WDTPW + WDTHOLD;               // Stop watchdog timer
 
-  init_i2c();
   configureAdc();
-  fillBuffer();
-  P1OUT = ~(0x10);
+  //fillBuffer();
+  
+  P1DIR |= 0x08;
+  P1OUT &= ~(0x08);
   
   while(1)
-  { 
+  {
+    //fillBuffer();
     
-    fillBuffer();
-    __delay_cycles(5000000); 
-    P1OUT = (0x10);
+    TxData[0]++;
+    TxData[1]++;
+    TxData[2]++;
+    
+    init_i2c();
+    PTxData = (unsigned char *)TxData;
+    P1OUT = (0x08);
+    
+    __bis_SR_register(CPUOFF + GIE); 
+    
+    //P1OUT &= ~(0x08); 
+    
+    long j;
+    for (j = 0; j < 1000000; j++);
+    
   }
 }
 //------------------------------------------------------------------------------
@@ -121,10 +132,8 @@ int main(void)
 __interrupt void USCIAB0TX_ISR(void)
 {
   UCB0TXBUF = *PTxData++;
-  //__bic_SR_register_on_exit(CPUOFF);      // Exit LPM0 if data was
-  //UCB0TXBUF = *PTxData++;         // Transmit data at address PTxData
-  //TXByteCtr++;                    // Increment TX byte counter
   
+ __bic_SR_register_on_exit(CPUOFF);      // Exit LPM0 if data was
 }
 
 //------------------------------------------------------------------------------
@@ -137,11 +146,8 @@ __interrupt void USCIAB0TX_ISR(void)
 #pragma vector = USCIAB0RX_VECTOR
 __interrupt void USCIAB0RX_ISR(void)
 {
-  //if (UCSTTIFG)
-  // status pin = 0
-  P1OUT = ~(0x10);
-  UCB0STAT &= ~(UCSTTIFG + UCSTTIFG);     // Clear interrupt flags
-  //UCB0STAT &= ~(UCSTPIFG + UCSTTIFG);     // Clear interrupt flags
-  //if (TXByteCtr)                          // Check TX byte counter
+  P1OUT &= ~(0x08);  
+  UCB0STAT &= ~(UCSTPIFG + UCSTTIFG);     // Clear interrupt flags
+  
   __bic_SR_register_on_exit(CPUOFF);      // Exit LPM0 if data was
 } 
